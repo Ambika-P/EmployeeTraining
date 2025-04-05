@@ -1,0 +1,294 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums based on comments and usage in Drizzle schema
+enum UserRole {
+  employee
+  contributor
+  admin
+}
+
+enum CourseDifficulty {
+  beginner
+  intermediate
+  advanced
+}
+
+enum CourseStatus {
+  draft
+  published
+  archived
+}
+
+enum QuestionType {
+  multiple_choice
+  true_false
+  short_answer
+}
+
+enum AssessmentStatus {
+  in_progress
+  completed
+  failed
+  passed
+}
+
+enum CourseAccessType {
+  view
+  edit
+}
+
+enum LessonProgressStatus {
+  not_started
+  in_progress
+  completed
+}
+
+// Models translated from Drizzle schema
+
+model User {
+  id             Int      @id @default(autoincrement())
+  username       String   @unique
+  email          String   @unique
+  password       String
+  firstName      String?  @map("first_name")
+  lastName       String?  @map("last_name")
+  role           UserRole @default(employee)
+  profilePicture String?  @map("profile_picture")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  coursesAuthored    Course[]            @relation("AuthoredCourses")
+  enrollments        Enrollment[]
+  assessmentAttempts AssessmentAttempt[]
+  groupMemberships   GroupMember[]
+  courseAccessGrants CourseAccess[]      @relation("UserAccess")
+  lessonProgress     LessonProgress[]
+  activityLogs       ActivityLog[]
+  certificates       Certificate[]
+
+  @@map("users")
+}
+
+model Course {
+  id           Int               @id @default(autoincrement())
+  title        String
+  description  String
+  category     String? // Added category field
+  thumbnail    String?
+  duration     Int? // in minutes
+  difficulty   CourseDifficulty?
+  instructorId Int?              @map("instructor_id")
+  status       CourseStatus      @default(draft)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at") // Use @updatedAt for auto-update
+
+  // Relations
+  instructor   User?          @relation("AuthoredCourses", fields: [instructorId], references: [id])
+  modules      Module[]
+  enrollments  Enrollment[]
+  courseAccess CourseAccess[] @relation("CourseAccess")
+  certificates Certificate[]
+
+  @@map("courses")
+}
+
+model Module {
+  id       Int    @id @default(autoincrement())
+  courseId Int    @map("course_id")
+  title    String
+  position Int
+
+  // Relations
+  course      Course       @relation(fields: [courseId], references: [id])
+  lessons     Lesson[]
+  assessments Assessment[]
+
+  @@map("modules")
+}
+
+model Lesson {
+  id       Int     @id @default(autoincrement())
+  moduleId Int     @map("module_id")
+  title    String
+  content  String?
+  videoUrl String? @map("video_url")
+  duration Int? // in seconds
+  position Int
+
+  // Relations
+  module         Module           @relation(fields: [moduleId], references: [id])
+  lessonProgress LessonProgress[]
+
+  @@map("lessons")
+}
+
+model Enrollment {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  courseId    Int       @map("course_id")
+  enrolledAt  DateTime  @default(now()) @map("enrolled_at")
+  completedAt DateTime? @map("completed_at")
+  progress    Int       @default(0) // percentage of completion
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@map("enrollments")
+}
+
+model Assessment {
+  id           Int      @id @default(autoincrement())
+  title        String
+  description  String?
+  moduleId     Int?     @map("module_id") // Optional relation to module
+  timeLimit    Int?     @map("time_limit") // in minutes
+  passingScore Int?     @map("passing_score") // percentage
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  module             Module?             @relation(fields: [moduleId], references: [id])
+  questions          Question[]
+  assessmentAttempts AssessmentAttempt[]
+
+  @@map("assessments")
+}
+
+model Question {
+  id            Int          @id @default(autoincrement())
+  assessmentId  Int          @map("assessment_id")
+  questionText  String       @map("question_text")
+  questionType  QuestionType @map("question_type")
+  options       Json?        @default("{}") // For multiple choice questions
+  correctAnswer String?      @map("correct_answer") // For true/false and short answers
+  explanation   String?
+  points        Int          @default(1)
+  position      Int
+
+  // Relations
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+
+  @@map("questions")
+}
+
+model AssessmentAttempt {
+  id           Int              @id @default(autoincrement())
+  userId       Int              @map("user_id")
+  assessmentId Int              @map("assessment_id")
+  startedAt    DateTime         @default(now()) @map("started_at")
+  completedAt  DateTime?        @map("completed_at")
+  score        Int?
+  answers      Json?            @default("{}")
+  status       AssessmentStatus @default(in_progress)
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id])
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+
+  @@map("assessment_attempts")
+}
+
+model Group {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  members      GroupMember[]
+  courseAccess CourseAccess[] @relation("GroupAccess")
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id      Int      @id @default(autoincrement())
+  groupId Int      @map("group_id")
+  userId  Int      @map("user_id")
+  addedAt DateTime @default(now()) @map("added_at")
+
+  // Relations
+  group Group @relation(fields: [groupId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("group_members")
+}
+
+model CourseAccess {
+  id         Int              @id @default(autoincrement())
+  courseId   Int              @map("course_id")
+  userId     Int?             @map("user_id") // Optional user relation
+  groupId    Int?             @map("group_id") // Optional group relation
+  accessType CourseAccessType @map("access_type")
+  grantedAt  DateTime         @default(now()) @map("granted_at")
+
+  // Relations
+  course Course @relation("CourseAccess", fields: [courseId], references: [id])
+  user   User?  @relation("UserAccess", fields: [userId], references: [id])
+  group  Group? @relation("GroupAccess", fields: [groupId], references: [id])
+
+  @@map("course_access")
+}
+
+model LessonProgress {
+  id             Int                  @id @default(autoincrement())
+  userId         Int                  @map("user_id")
+  lessonId       Int                  @map("lesson_id")
+  status         LessonProgressStatus @default(not_started)
+  lastAccessedAt DateTime             @default(now()) @map("last_accessed_at")
+  completedAt    DateTime?            @map("completed_at")
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@map("lesson_progress")
+}
+
+model ActivityLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  action       String
+  resourceType String?  @map("resource_type")
+  resourceId   Int?     @map("resource_id")
+  metadata     Json?    @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("activity_logs")
+}
+
+model Certificate {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  courseId       Int      @map("course_id")
+  issueDate      DateTime @default(now()) @map("issue_date")
+  certificateUrl String?  @map("certificate_url")
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@map("certificates")
+}
+
+// Session table for connect-pg-simple
+model Session {
+  sid    String   @id @map("sid")
+  sess   Json     @map("sess")
+  expire DateTime @map("expire")
+
+  @@map("session") // Ensure table name matches connect-pg-simple default
+}

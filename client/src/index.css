@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+  
+  /* Modern typography - slightly smaller base size with better hierarchical scaling */
+  html {
+    font-size: 15px;
+  }
+  
+  h1 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  
+  h2 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+  
+  h3 {
+    @apply text-lg font-medium;
+  }
+  
+  /* Better spacing between paragraphs */
+  p {
+    @apply leading-relaxed;
+  }
+  
+  p + p {
+    @apply mt-4;
+  }
+  
+  /* Improve form inputs */
+  input, select, textarea {
+    @apply text-sm;
+  }
+  
+  /* Improved button text */
+  button {
+    @apply font-medium;
+  }
+}
+
+/* Minimalistic scrollbar for sidebar */
+.sidebar-scroll-container::-webkit-scrollbar {
+  width: 6px; /* Make scrollbar thinner */
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-track {
+  background: transparent; /* Hide the track */
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5); /* Subtle gray thumb */
+  border-radius: 3px; /* Rounded thumb */
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.7); /* Slightly darker on hover */
+}
