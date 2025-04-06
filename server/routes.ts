@@ -71,12 +71,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
   app.get('/api/users', isAuthenticated, hasRole(['admin']), async (req, res) => {
     try {
+      const { search, role } = req.query;
       const users = await storage.getUsers();
-      // Ensure password is not included if the type still has it (Prisma select can exclude it)
-      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
-      res.json(usersWithoutPasswords);
+      let filteredUsers = users.map(({ password, ...user }) => user);
+      
+      if (search) {
+        const searchStr = search.toString().toLowerCase();
+        filteredUsers = filteredUsers.filter(user => 
+          user.username.toLowerCase().includes(searchStr) ||
+          user.email.toLowerCase().includes(searchStr) ||
+          user.firstName?.toLowerCase().includes(searchStr) ||
+          user.lastName?.toLowerCase().includes(searchStr)
+        );
+      }
+
+      if (role && role !== 'all') {
+        filteredUsers = filteredUsers.filter(user => user.role === role);
+      }
+
+      res.json(filteredUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/users/:id', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put('/api/users/:id', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      // Remove sensitive fields that shouldn't be updated directly
+      delete updateData.password;
+      
+      const updatedUser = await storage.updateUser(userId, updateData);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete('/api/users/:id', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      await storage.deleteUser(userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting user:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -868,6 +930,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       // if (error instanceof z.ZodError) { ... }
       console.error("Error updating lesson progress:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Category Management Routes
+  app.get('/api/categories', isAuthenticated, async (req, res) => {
+    try {
+      const categories = await storage.getCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post('/api/categories', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) {
+        return res.status(400).json({ message: "Category name is required" });
+      }
+
+      const newCategory = await storage.createCategory({ name });
+      res.status(201).json(newCategory);
+    } catch (error) {
+      console.error("Error creating category:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put('/api/categories/:id', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    try {
+      const categoryId = parseInt(req.params.id);
+      const { name } = req.body;
+
+      if (isNaN(categoryId)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+
+      if (!name) {
+        return res.status(400).json({ message: "Category name is required" });
+      }
+
+      const updatedCategory = await storage.updateCategory(categoryId, { name });
+      if (!updatedCategory) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
+      res.json(updatedCategory);
+    } catch (error) {
+      console.error("Error updating category:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete('/api/categories/:id', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    try {
+      const categoryId = parseInt(req.params.id);
+      if (isNaN(categoryId)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+
+      const deleted = await storage.deleteCategory(categoryId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting category:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

@@ -60,7 +60,7 @@ export function RegisterForm() {
       setStep(step + 1);
       return;
     }
-    
+
     const { termsAccepted, ...registerData } = data;
     await registerMutation.mutateAsync(registerData);
     setLocation("/");
@@ -69,13 +69,13 @@ export function RegisterForm() {
   const passwordStrength = (password: string) => {
     if (password.length === 0) return 0;
     if (password.length < 6) return 1;
-    
+
     let strength = 0;
     if (password.length >= 8) strength += 1;
     if (/[A-Z]/.test(password)) strength += 1;
     if (/[0-9]/.test(password)) strength += 1;
     if (/[^A-Za-z0-9]/.test(password)) strength += 1;
-    
+
     return strength;
   };
 
@@ -101,16 +101,16 @@ export function RegisterForm() {
 
   const checkStepValidity = (currentStep: number) => {
     switch (currentStep) {
-      case 1: 
-        return !form.formState.errors.username && 
-               !form.formState.errors.email && 
-               form.getValues('username') && 
-               form.getValues('email');
+      case 1:
+        return !form.formState.errors.username &&
+          !form.formState.errors.email &&
+          form.getValues('username') &&
+          form.getValues('email');
       case 2:
-        return !form.formState.errors.password && 
-               !form.formState.errors.confirmPassword && 
-               form.getValues('password') && 
-               form.getValues('confirmPassword');
+        return !form.formState.errors.password &&
+          !form.formState.errors.confirmPassword &&
+          form.getValues('password') &&
+          form.getValues('confirmPassword');
       case 3:
         return form.getValues('termsAccepted');
       default:
@@ -140,15 +140,14 @@ export function RegisterForm() {
           <CardHeader className="pb-3">
             <div className="flex justify-between mb-2">
               {Array(totalSteps).fill(0).map((_, i) => (
-                <div 
-                  key={i} 
-                  className={`flex items-center justify-center h-8 w-8 rounded-full text-xs font-semibold ${
-                    i + 1 === step 
-                      ? 'bg-blue-600 text-white' 
-                      : i + 1 < step 
-                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-200' 
-                        : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
-                  }`}
+                <div
+                  key={i}
+                  className={`flex items-center justify-center h-8 w-8 rounded-full text-xs font-semibold ${i + 1 === step
+                    ? 'bg-blue-600 text-white'
+                    : i + 1 < step
+                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-200'
+                      : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+                    }`}
                 >
                   {i + 1 < step ? <Check className="h-4 w-4" /> : i + 1}
                 </div>
@@ -160,7 +159,7 @@ export function RegisterForm() {
               {step === 3 && "Final Steps"}
             </CardTitle>
             <CardDescription className="text-sm">
-              {step === 1 && "Set up your basic account details"}
+              {step === 1 && "Set up basic account details"}
               {step === 2 && "Create a secure password"}
               {step === 3 && "Just a few more details"}
             </CardDescription>
@@ -228,7 +227,7 @@ export function RegisterForm() {
                 </div>
               </div>
             )}
-            
+
             {step === 2 && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -243,10 +242,10 @@ export function RegisterForm() {
                       <FormLabel className="mb-1 text-xs">Password</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Input 
-                            type={showPassword ? "text" : "password"} 
-                            placeholder="••••••••" 
-                            {...field} 
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
+                            {...field}
                             autoComplete="new-password"
                             className="h-9"
                           />
@@ -286,10 +285,10 @@ export function RegisterForm() {
                       <FormLabel className="mb-1 text-xs">Confirm Password</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Input 
-                            type={showConfirmPassword ? "text" : "password"} 
-                            placeholder="••••••••" 
-                            {...field} 
+                          <Input
+                            type={showConfirmPassword ? "text" : "password"}
+                            placeholder="••••••••"
+                            {...field}
                             autoComplete="new-password"
                             className="h-9"
                           />
@@ -310,7 +309,7 @@ export function RegisterForm() {
                 />
               </div>
             )}
-            
+
             {step === 3 && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -358,7 +357,7 @@ export function RegisterForm() {
                             terms and conditions
                           </Button>
                         </FormLabel>
-                        <FormMessage className="text-xs"/>
+                        <FormMessage className="text-xs" />
                       </div>
                     </FormItem>
                   )}
@@ -375,10 +374,10 @@ export function RegisterForm() {
             ) : (
               <div></div>
             )}
-            
+
             {step < totalSteps ? (
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 onClick={moveToNextStep}
                 disabled={!checkStepValidity(step)}
               >

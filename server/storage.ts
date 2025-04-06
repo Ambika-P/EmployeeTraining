@@ -359,6 +359,40 @@ export class PrismaStorage implements IStorage {
     }
   }
 
+   // --- Category Methods ---
+async getCategories(): Promise<Category[]> {
+  return this.prisma.category.findMany();
+}
+
+async getCategory(id: number): Promise<Category | null> {
+  return this.prisma.category.findUnique({ where: { id } });
+}
+
+async createCategory(category: { name: string }): Promise<Category> {
+  return this.prisma.category.create({ data: category });
+}
+
+async updateCategory(id: number, category: { name: string }): Promise<Category | null> {
+  try {
+    return await this.prisma.category.update({
+      where: { id },
+      data: category,
+    });
+  } catch (error) {
+    return null;
+  }
+}
+
+async deleteCategory(id: number): Promise<boolean> {
+  try {
+    await this.prisma.category.delete({ where: { id } });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+
   // --- Assessment Methods ---
   async getAssessment(id: number): Promise<Assessment | null> {
     return this.prisma.assessment.findUnique({ where: { id } });

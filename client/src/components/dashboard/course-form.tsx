@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 // Define the schema for course data
 const courseFormSchema = z.object({
@@ -25,6 +26,14 @@ interface CourseFormProps {
 }
 
 export function CourseForm({ initialData, onSubmit, isSubmitting }: CourseFormProps) {
+  const { data: categories } = useQuery({
+    queryKey: ['/api/categories'],
+    queryFn: async () => {
+      const response = await fetch('/api/categories');
+      if (!response.ok) throw new Error('Failed to fetch categories');
+      return response.json();
+    }
+  });
   const form = useForm<CourseFormData>({
     resolver: zodResolver(courseFormSchema),
     defaultValues: {
@@ -89,12 +98,11 @@ export function CourseForm({ initialData, onSubmit, isSubmitting }: CourseFormPr
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {/* These should ideally come from the backend or a config file */}
-                  <SelectItem value="programming">Programming</SelectItem>
-                  <SelectItem value="design">Design</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
-                  <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                {categories?.map((category) => (
+                  <SelectItem key={category.id} value={category.name}>
+                    {category.name}
+                  </SelectItem>
+                ))}
                 </SelectContent>
               </Select>
               <FormMessage />

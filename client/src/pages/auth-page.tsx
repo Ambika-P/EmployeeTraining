@@ -39,7 +39,7 @@ export default function AuthPage() {
             )}
           </Button>
         </div>
-        
+
         <div className="mx-auto w-full max-w-sm lg:w-[420px]">
           <div className="text-center lg:text-left mb-8">
             <div className="flex items-center mb-4">
@@ -54,37 +54,37 @@ export default function AuthPage() {
           </div>
 
           <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+            {/* <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="login">Sign In</TabsTrigger>
               <TabsTrigger value="register">Create Account</TabsTrigger>
-            </TabsList>
+            </TabsList> */}
             <div>
-              <TabsContent value="login">
-                <Card className="border-slate-200 dark:border-slate-700">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-2xl">Sign in to your account</CardTitle>
-                    <CardDescription className="text-slate-500 dark:text-slate-400">
-                      Enter your credentials to access your account
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <LoginForm />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              <TabsContent value="register">
+              {/* <TabsContent value="login"> */}
+              <Card className="border-slate-200 dark:border-slate-700">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl">Sign in to your account</CardTitle>
+                  <CardDescription className="text-slate-500 dark:text-slate-400">
+                    Enter your credentials to access your account
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <LoginForm />
+                </CardContent>
+              </Card>
+              {/* </TabsContent> */}
+              {/* <TabsContent value="register">
                 <Card className="border-slate-200 dark:border-slate-700">
                   <CardHeader className="pb-4">
                     <CardTitle className="text-2xl">Create a new account</CardTitle>
                     <CardDescription className="text-slate-500 dark:text-slate-400">
-                      Fill in your details to get started
+                      Fill in the user details to create a new account
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <RegisterForm />
                   </CardContent>
                 </Card>
-              </TabsContent>
+              </TabsContent> */}
             </div>
           </Tabs>
         </div>
@@ -105,7 +105,7 @@ export default function AuthPage() {
                   <p className="text-blue-100 text-sm">Access hundreds of courses across various disciplines</p>
                 </div>
               </div>
-              
+
               <div className="flex items-start">
                 <div className="flex-shrink-0 bg-blue-500/30 p-3 rounded-lg mr-4">
                   <GraduationCap className="h-6 w-6" />
@@ -115,7 +115,7 @@ export default function AuthPage() {
                   <p className="text-blue-100 text-sm">Flexible learning schedule that fits your busy lifestyle</p>
                 </div>
               </div>
-              
+
               <div className="flex items-start">
                 <div className="flex-shrink-0 bg-blue-500/30 p-3 rounded-lg mr-4">
                   <CheckCircle2 className="h-6 w-6" />
@@ -125,7 +125,7 @@ export default function AuthPage() {
                   <p className="text-blue-100 text-sm">Earn recognized certificates upon course completion</p>
                 </div>
               </div>
-              
+
               <div className="flex items-start">
                 <div className="flex-shrink-0 bg-blue-500/30 p-3 rounded-lg mr-4">
                   <BarChart3 className="h-6 w-6" />
@@ -136,12 +136,12 @@ export default function AuthPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="absolute bottom-8 right-8 text-xs text-blue-200 opacity-70">
               © 2025 LearnSphere. All rights reserved.
             </div>
           </div>
-          
+
           {/* Abstract shapes for visual interest */}
           <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-indigo-900/30 to-transparent"></div>
           <div className="absolute top-[15%] right-[10%] w-64 h-64 rounded-full bg-blue-500/10 blur-3xl"></div>

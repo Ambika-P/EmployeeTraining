@@ -115,6 +115,7 @@ export function Sidebar({ className }: SidebarProps) {
             <div className="mt-2 space-y-1">
               <NavItem href="/user-management" icon={UserCog} label="User Management" itemKey="user-management" />
               <NavItem href="/group-management" icon={Users} label="Group Management" itemKey="group-management" />
+              <NavItem href="/category-management" icon={FileEdit} label="Category Management" itemKey="category-management" />
               <NavItem href="/course-approval" icon={CheckSquare} label="Course Approval" itemKey="course-approval" />
               <NavItem href="/access-control" icon={Lock} label="Access Control" itemKey="access-control" />
               <NavItem href="/system-settings" icon={Settings} label="System Settings" itemKey="system-settings" />
