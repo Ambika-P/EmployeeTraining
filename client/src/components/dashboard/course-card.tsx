@@ -43,6 +43,9 @@ export function CourseCard({
           src={thumbnailUrl || defaultThumbnail} 
           alt={title} 
           className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = defaultThumbnail;
+          }}
         />
         {rating && (
           <div className="absolute top-2 right-2 bg-accent text-white text-xs font-medium px-2 py-1 rounded">

@@ -7,10 +7,15 @@ import { StatsCard } from "@/components/dashboard/stats-card";
 import { CourseCard } from "@/components/dashboard/course-card";
 import { ActivityItem } from "@/components/dashboard/activity-item";
 import { Filter, BookOpen, CheckSquare, Clock, Medal, Video, Award, FileText } from "lucide-react";
+import { useLocation } from "wouter";
+import { useState } from "react";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const currentDate = format(new Date(), "MMMM d, yyyy");
+  const [, navigate] = useLocation();
+
+
 
   // Fetch enrollments for the current user
   const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
@@ -33,7 +38,7 @@ export default function Dashboard() {
   };
 
   // Mock data for demo purposes - in a real application, this would come from API
-  const inProgressCourses = enrollments?.filter(e => !e.completedAt).slice(0, 3) || [];
+  const inProgressCourses = enrollments?.filter((e: any) => e.progress < 100).slice(0, 3) || [];
   const recommendedCourses = [];
 
   return (
@@ -79,24 +84,8 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="mt-4 flex md:mt-0 md:ml-4 space-x-3">
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-            </Button>
-            <Button>
-              <svg
-                className="mr-2 h-4 w-4"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
+            <Button variant="outline" onClick={() => navigate('/course-catalog')}>
+              <BookOpen className="mr-2 h-4 w-4" />
               Explore Courses
             </Button>
           </div>

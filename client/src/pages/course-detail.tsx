@@ -67,6 +67,10 @@ type LessonProgress = { lessonId: number; status: string; };
 
 export default function CourseDetail() {
   const { user } = useAuth();
+  const { data: enrollments = [] } = useQuery<any[]>({
+    queryKey: ["/api/enrollments"],
+    enabled: !!user,
+  });
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient(); // Get query client instance
@@ -261,6 +265,8 @@ export default function CourseDetail() {
   const totalLessons = course.modules?.reduce((sum: number, module: Module) => sum + (module.lessons?.length || 0), 0) || 0;
   const completedLessonsCount = Object.values(lessonCompletionMap).filter(Boolean).length;
 
+  const isEnrolled = enrollments.some((e) => e.courseId === course.id);
+
   return (
     <MainLayout>
       {/* Header */}
@@ -287,8 +293,8 @@ export default function CourseDetail() {
             </div>
             <div className="mt-4 flex gap-3 md:mt-0">
               {/* Start/Continue Button based on fetched progress */}
-              {course.progress > 0 ? ( 
-                <Button onClick={handleContinueProgress} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">Continue Learning</Button>
+              {isEnrolled ? ( 
+                <Button onClick={handleContinueProgress} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white">Continue Course</Button>
               ) : (
                 <Button 
                   onClick={handleStartCourse} 
@@ -410,7 +416,14 @@ export default function CourseDetail() {
                 </CardContent>
                 <CardFooter>
                   {/* Show Start Learning button only if not enrolled (progress === 0) */}
-                  {course.progress === 0 && ( 
+                  {isEnrolled ? (
+                    <Button 
+                      onClick={handleContinueProgress} 
+                      className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
+                    >
+                      Continue Learning
+                    </Button>
+                  ) : (
                     <Button 
                       onClick={handleStartCourse} 
                       className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"

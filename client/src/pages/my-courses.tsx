@@ -5,7 +5,7 @@ import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, ArrowRight, Clock, BookOpen, CheckCircle, Loader2 } from "lucide-react"; // Import Loader2
+import { Search, ArrowRight, Clock, BookOpen, CheckCircle, Loader2, ChevronDown } from "lucide-react"; // Import icons
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useLocation } from "wouter"; 
@@ -48,9 +48,39 @@ export default function MyCourses() {
     enabled: !!user, 
   });
 
-  // Filter enrollments into in-progress and completed
-  const inProgressCourses = enrollments.filter(e => !e.completedAt && e.course);
-  const completedCourses = enrollments.filter(e => e.completedAt && e.course);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [sortOrder, setSortOrder] = useState("newest");
+
+  const filteredEnrollments = enrollments.filter(e => {
+    const course = e.course;
+    if (!course) return false;
+
+    const matchesSearch =
+      !searchQuery ||
+      (course.title && course.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (course.description && course.description.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesCategory = category === "all" || course.category === category;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  const sortedEnrollments = [...filteredEnrollments].sort((a, b) => {
+    if (sortOrder === "newest") {
+      return new Date(b.enrolledAt).getTime() - new Date(a.enrolledAt).getTime();
+    } else if (sortOrder === "oldest") {
+      return new Date(a.enrolledAt).getTime() - new Date(b.enrolledAt).getTime();
+    } else if (sortOrder === "az") {
+      return (a.course?.title || "").localeCompare(b.course?.title || "");
+    } else if (sortOrder === "za") {
+      return (b.course?.title || "").localeCompare(a.course?.title || "");
+    }
+    return 0;
+  });
+
+  const completedCourses = sortedEnrollments.filter(e => (e.progress === 100 || e.completedAt) && e.course);
+  const inProgressCourses = sortedEnrollments.filter(e => !(e.progress === 100 || e.completedAt) && e.course);
 
   // TODO: Implement search/filter/sort logic based on fetched data if needed
 
@@ -70,16 +100,38 @@ export default function MyCourses() {
         <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
           <div className="relative w-full md:w-64">
             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input placeholder="Search your courses..." className="pl-8" />
+            <Input
+              placeholder="Search your courses..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
-              Sort By
-            </Button>
-            <select className="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm">
-              <option value="all">All Categories</option>
-              {/* Add dynamic categories later */}
-            </select>
+            <div className="relative">
+              <select
+                className="appearance-none rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 pl-3 pr-8 py-2 text-sm"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="az">A-Z</option>
+                <option value="za">Z-A</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            </div>
+            <div className="relative">
+              <select
+                className="appearance-none rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 pl-3 pr-8 py-2 text-sm"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                {/* Add dynamic categories later */}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            </div>
           </div>
         </div>
         
@@ -191,9 +243,14 @@ export default function MyCourses() {
                             Instructor: <span className="font-medium">{enrollment.course?.instructor?.firstName || 'N/A'}</span>
                           </div>
                           {/* Link to review the course, maybe back to course detail */}
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/course-detail?id=${enrollment.courseId}`)}>
-                            Review Course
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => navigate(`/course-content?id=${enrollment.courseId}`)}>
+                              View Course
+                            </Button>
+                            <Button variant="default" size="sm" onClick={() => navigate(`/course-detail?id=${enrollment.courseId}`)}>
+                              Review Course
+                            </Button>
+                          </div>
                         </CardFooter>
                       </Card>
                     ))}

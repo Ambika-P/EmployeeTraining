@@ -28,7 +28,7 @@ import AuthPage from "@/pages/auth-page";
 import ForgotPassword from "@/pages/forgot-password";
 import NotFound from "@/pages/not-found";
 import CreateCoursePage from "./pages/create-course";
-import EditCoursePage from "./pages/edit-course"; // Import EditCoursePage
+import EditCoursePage from "./pages/edit-course";
 import CategoryManagement from "./pages/category-management";
 import AddUser from "./pages/add-user";
 

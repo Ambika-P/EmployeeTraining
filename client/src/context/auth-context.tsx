@@ -4,7 +4,7 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { 
+import {
   InsertUser, LoginUser, User, ForgotPassword
 } from "@shared/schema";
 import { apiRequest, queryClient } from "../lib/queryClient";
@@ -24,7 +24,7 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  
+
   const {
     data: user,
     error,
@@ -37,16 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch(queryKey[0] as string, {
           credentials: "include",
         });
-        
+
         if (res.status === 401) {
           return null;
         }
-        
+
         if (!res.ok) {
           const text = await res.text();
           throw new Error(text || res.statusText);
         }
-        
+
         return await res.json();
       } catch (error) {
         console.error("Error fetching user:", error);
@@ -85,13 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Registration successful",
-        description: `Welcome, ${user.firstName || user.username}!`,
+        description: `User added successfully`,
       });
     },
     onError: (error: Error) => {
       toast({
         title: "Registration failed",
-        description: error.message,
+        description: "Registration failed",
         variant: "destructive",
       });
     },

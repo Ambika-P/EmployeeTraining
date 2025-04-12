@@ -25,6 +25,7 @@ export default function CreateCoursePage() {
         },
         body: JSON.stringify({
           ...data,
+          thumbnail: data.thumbnail || null,
           // instructorId is set on the backend based on the authenticated user
         }),
       });

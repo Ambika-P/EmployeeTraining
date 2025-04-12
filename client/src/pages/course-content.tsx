@@ -30,8 +30,76 @@ type Course = {
 // Type for user-specific progress (fetch separately)
 type LessonProgress = { lessonId: number; status: string; };
 
+import { useQuery } from "@tanstack/react-query";
+
 export default function CourseContent() {
+  const [comments, setComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+
+  const fetchComments = async (lessonId: number) => {
+    try {
+      const res = await fetch(`/api/comments?lessonId=${lessonId}`);
+      if (!res.ok) throw new Error("Failed to fetch comments");
+      const data = await res.json();
+      setComments(data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handlePostComment = async () => {
+    if (!currentLesson?.id || !newComment.trim()) return;
+    try {
+      const res = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lessonId: currentLesson.id,
+          comment: newComment.trim(),
+          parentId: null,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to post comment");
+      setNewComment("");
+      fetchComments(currentLesson.id);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handlePostReply = async (parentId: number) => {
+    if (!currentLesson?.id || !replyText.trim()) return;
+    try {
+      const res = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lessonId: currentLesson.id,
+          comment: replyText.trim(),
+          parentId,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to post reply");
+      setReplyText("");
+      setReplyingTo(null);
+      fetchComments(currentLesson.id);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const toggleReply = (commentId: number) => {
+    setReplyingTo(replyingTo === commentId ? null : commentId);
+    setReplyText("");
+  };
+
   const { user } = useAuth();
+  const { data: certificates = [] } = useQuery<any[]>({
+    queryKey: ["/api/certificates-user"],
+    enabled: !!user,
+  });
   const [location, setLocation] = useLocation();
   const search = useSearch(); // Use wouter's useSearch hook
   const { toast } = useToast();
@@ -60,7 +128,6 @@ export default function CourseContent() {
       }
       setIsLoading(true);
       try {
-        // Fetch the course data including nested modules and lessons
         const response = await fetch(`/api/courses/${courseId}`);
         if (!response.ok) {
           if (response.status === 404) throw new Error("Course not found");
@@ -68,31 +135,25 @@ export default function CourseContent() {
         }
         const data: Course = await response.json();
 
-        // Ensure modules and lessons are sorted by position
-        // Use optional chaining in case modules/lessons might be missing
         data.modules?.sort((a, b) => a.position - b.position);
         data.modules?.forEach(m => m.lessons?.sort((a, b) => a.position - b.position));
 
+
         setCourse(data);
 
-        // Find the initial module and lesson based on URL params or defaults
         const initialModuleId = currentModuleIdParam ? parseInt(currentModuleIdParam, 10) : data.modules?.[0]?.id;
         const initialLessonId = currentLessonIdParam ? parseInt(currentLessonIdParam, 10) : data.modules?.[0]?.lessons?.[0]?.id;
 
         const initialModule = data.modules?.find(m => m.id === initialModuleId);
-        // Ensure initialLesson is searched within the found initialModule OR the first module
         const moduleToSearchIn = initialModule || data.modules?.[0];
         const initialLesson = moduleToSearchIn?.lessons?.find(l => l.id === initialLessonId);
 
         setCurrentModule(initialModule || data.modules?.[0] || null);
-        // Ensure the initial lesson belongs to the initial module, or is the first lesson of the first module
         setCurrentLesson(initialLesson || moduleToSearchIn?.lessons?.[0] || null);
 
-        // Fetch user's lesson progress for this course
         if (user?.id) {
           try {
-            // Make sure courseId exists before fetching progress
-            const progressResponse = await fetch(`/api/courses/${courseId}/progress`); // Use the new endpoint
+            const progressResponse = await fetch(`/api/courses/${courseId}/progress`);
             if (progressResponse.ok) {
               const progressData: LessonProgress[] = await progressResponse.json();
               const progressMap = progressData.reduce((acc: Record<number, boolean>, p) => {
@@ -102,72 +163,60 @@ export default function CourseContent() {
               setLessonProgressMap(progressMap);
             } else {
               console.error("Failed to fetch lesson progress:", progressResponse.statusText);
-              // Optionally show a toast for progress fetch failure, but don't block course loading
             }
           } catch (progressError) {
             console.error("Error fetching lesson progress:", progressError);
-             // Optionally show a toast for progress fetch failure
           }
         }
 
       } catch (error) {
         console.error("Failed to fetch course data:", error);
         toast({ title: "Error", description: `Could not load course: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
-        setCourse(null); // Ensure course is null on error
+        setCourse(null);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchCourseData();
-  // Removed `toast` and `setLocation` from deps as they are stable functions from hooks
-  // Added currentModuleIdParam and currentLessonIdParam to refetch if URL changes externally triggering this hook
-  }, [courseId, user?.id, currentModuleIdParam, currentLessonIdParam, setLocation]);
+  }, [courseId, user?.id, setLocation, toast]);
 
-  // Update current module/lesson when URL params change (after initial load)
-   useEffect(() => {
-    // Run only if course data is loaded and we are not currently loading
-    if (course && !isLoading) {
-      // Use fallback '0' if params are null/undefined, then parse
-      const newModuleId = parseInt(queryParams.get("moduleId") || "0", 10);
-      const newLessonId = parseInt(queryParams.get("lessonId") || "0", 10);
+  // Change lesson without re-fetching course
+  useEffect(() => {
+    if (!course) return;
+    const newModuleId = parseInt(queryParams.get("moduleId") || "0", 10);
+    const newLessonId = parseInt(queryParams.get("lessonId") || "0", 10);
 
-      // Find the target module and lesson based on new IDs
-      const targetModule = course.modules?.find(m => m.id === newModuleId);
-      const finalModule = targetModule || course.modules?.[0]; // Default to first module if target not found
-      
-      const targetLesson = finalModule?.lessons?.find(l => l.id === newLessonId);
-      const finalLesson = targetLesson || finalModule?.lessons?.[0]; // Default to first lesson of the final module
+    const targetModule = course.modules?.find(m => m.id === newModuleId);
+    const finalModule = targetModule || course.modules?.[0];
 
-      // Update state only if the derived module/lesson is different from the current one
-      // Prevent unnecessary re-renders and potential loops
-      if (finalModule && finalLesson && (currentModule?.id !== finalModule.id || currentLesson?.id !== finalLesson.id)) {
-        setCurrentModule(finalModule);
-        setCurrentLesson(finalLesson);
-      }
-      // Handle cases where no module/lesson could be determined (e.g., empty course)
-      else if (!finalModule && currentModule !== null) {
-         setCurrentModule(null);
-         setCurrentLesson(null);
-      } else if (finalModule && !finalLesson && currentLesson !== null) {
-          setCurrentModule(finalModule); // Keep module if found
-          setCurrentLesson(null);
-      }
+    const targetLesson = finalModule?.lessons?.find(l => l.id === newLessonId);
+    const finalLesson = targetLesson || finalModule?.lessons?.[0];
+
+    if (finalModule && finalLesson) {
+      setCurrentModule(finalModule);
+      setCurrentLesson(finalLesson);
     }
-  // Depend on `search` (which reflects queryParams), `course` data, and `isLoading` status.
-  // Also include currentModule and currentLesson to compare against potential new values.
-  }, [search, course, isLoading, currentModule, currentLesson, queryParams]);
+  }, [search, course]);
+
+  // Fetch comments when currentLesson changes
+  useEffect(() => {
+    if (currentLesson?.id) {
+      fetchComments(currentLesson.id);
+    }
+  }, [currentLesson?.id]);
 
 
   // Calculate navigation links
   const allLessons = course?.modules.flatMap(m => m.lessons.map(l => ({ ...l, moduleId: m.id }))) || [];
+  const filteredLessons = allLessons.filter(l => !l.title.toLowerCase().includes("certificate"));
   const currentLessonIndex = allLessons.findIndex(l => l.moduleId === currentModule?.id && l.id === currentLesson?.id);
   const previousLesson = currentLessonIndex > 0 ? allLessons[currentLessonIndex - 1] : null;
   const nextLesson = currentLessonIndex < allLessons.length - 1 ? allLessons[currentLessonIndex + 1] : null;
 
-  // Calculate completion statistics
-  const totalLessons = allLessons.length;
-  const completedLessons = Object.values(lessonProgressMap).filter(Boolean).length;
+  // Calculate completion statistics excluding dummy lesson
+  const totalLessons = filteredLessons.length;
+  const completedLessons = filteredLessons.filter(l => lessonProgressMap[l.id]).length;
   const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
   const handleMarkComplete = async () => {
@@ -238,16 +287,21 @@ export default function CourseContent() {
 
   // Determine lesson type icon (simplified)
   const getLessonIcon = (lesson: Lesson) => {
-     // Ensure lesson.id is valid before accessing map
-     const isCompleted = lesson.id ? lessonProgressMap[lesson.id] ?? false : false;
-     const iconColor = isCompleted ? "text-green-500" : "text-slate-400";
-     const iconClasses = `mr-3 h-5 w-5 ${iconColor}`;
+    const isCertificateLesson = lesson.title.toLowerCase().includes("certificate");
+    let iconColor = "text-slate-400";
 
-     if (lesson.videoUrl) return <PlayCircle className={iconClasses} />;
-     // Add checks for quiz/assignment types if they exist in your data model
-     // if (lesson.type === 'quiz') return <ClipboardCheck className={iconClasses} />;
-     // if (lesson.type === 'reading') return <BookOpen className={iconClasses} />;
-     return <FileText className={iconClasses} />;
+    if (isCertificateLesson) {
+      const hasCert = certificates.some((c) => c.courseId === course?.id);
+      iconColor = hasCert ? "text-green-500" : "text-slate-400";
+    } else {
+      const isCompleted = lesson.id ? lessonProgressMap[lesson.id] ?? false : false;
+      iconColor = isCompleted ? "text-green-500" : "text-slate-400";
+    }
+
+    const iconClasses = `mr-3 h-5 w-5 ${iconColor}`;
+
+    if (lesson.videoUrl) return <PlayCircle className={iconClasses} />;
+    return <FileText className={iconClasses} />;
   };
 
   // --- Render Logic ---
@@ -319,14 +373,7 @@ export default function CourseContent() {
             </Link>
           </div>
            {/* Header Progress Bar */}
-           <div className="flex-grow mx-4 min-w-0"> {/* Allow shrinking, prevent overflow */}
-                {/* Added a label for accessibility */}
-               <span id="progress-label" className="sr-only">Course completion progress</span>
-               <Progress value={progressPercentage} className="h-2 w-full" aria-labelledby="progress-label" />
-           </div>
-           <div className="text-sm font-medium text-slate-600 dark:text-slate-300 hidden md:block flex-shrink-0"> {/* Hide percentage on small screens, prevent shrinking */}
-             {progressPercentage}% Complete
-           </div>
+           <div className="flex-grow mx-4 min-w-0"></div>
         </div>
       </div>
 
@@ -347,6 +394,13 @@ export default function CourseContent() {
               <Card>
                 <CardHeader className="p-4"> {/* Reduced padding */}
                   <CardTitle className="text-lg line-clamp-2">{course.title}</CardTitle> {/* Allow wrapping */}
+                  <div className="mt-2">
+                    <div className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">
+                      {progressPercentage}% Complete
+                    </div>
+                    <span id="progress-label" className="sr-only">Course completion progress</span>
+                    <Progress value={progressPercentage} className="h-2 w-full" aria-labelledby="progress-label" />
+                  </div>
                   {/* Removed CardDescription - Progress moved to header */}
                 </CardHeader>
                 <CardContent className="p-0">
@@ -450,7 +504,37 @@ export default function CourseContent() {
               </CardHeader>
               <CardContent className="p-0">
                 {/* Video Player or Text Content */}
-                {currentLesson.videoUrl ? (
+                {currentLesson.title.toLowerCase().includes("certificate") ? (
+                  <div className="p-6 text-center flex flex-col items-center gap-4">
+                    <h2 className="text-2xl font-bold text-green-600 dark:text-green-400">Congratulations!</h2>
+                    <p className="text-slate-600 dark:text-slate-300">You have completed the course.</p>
+                    <Button
+                      variant="default"
+                      disabled={
+                        progressPercentage < 100 ||
+                        certificates.some((c) => c.courseId === course?.id)
+                      }
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/certificates/${course?.id}`, {
+                            method: "POST",
+                          });
+                          if (!res.ok) throw new Error("Failed to generate certificate");
+                          const data = await res.json();
+                          alert(`Certificate generated! ID: ${data.certificateId}`);
+                          const { queryClient } = await import("@/lib/queryClient");
+                          queryClient.invalidateQueries({ queryKey: ["/api/certificates-user"] });
+                        } catch (err) {
+                          console.error(err);
+                          alert("Failed to generate certificate");
+                        }
+                      }}
+                    >
+                      <Download className="mr-2 h-4 w-4 text-yellow-500" />
+                      Generate Certificate
+                    </Button>
+                  </div>
+                ) : currentLesson.videoUrl ? (
                   <div className="aspect-video bg-black rounded-t-none"> {/* Removed top rounding if card has it */}
                     <video
                       key={currentLesson.videoUrl} // Force re-render on URL change
@@ -537,14 +621,77 @@ export default function CourseContent() {
                       </TabsContent>
 
                       <TabsContent value="discussion">
-                          <div className="space-y-3">
-                              <h3 className="text-base font-medium">Discussion</h3>
-                               {/* TODO: Implement Discussion Feature */}
-                              <div className="flex flex-col items-center gap-2 text-center text-sm text-slate-500 dark:text-slate-400 border rounded-md p-6 bg-slate-50 dark:bg-slate-800/30">
-                                <MessageSquare className="h-8 w-8 text-slate-400"/>
-                                <span>Discussion feature coming soon. Ask questions and share insights here!</span>
-                              </div>
+                        <div className="space-y-4">
+                          <h3 className="text-base font-medium">Discussion</h3>
+
+                          {/* New comment input */}
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Add a comment..."
+                              className="flex-1 border rounded px-3 py-2 text-sm bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                              value={newComment}
+                              onChange={(e) => setNewComment(e.target.value)}
+                            />
+                            <Button size="sm" onClick={handlePostComment} disabled={!newComment.trim()}>
+                              Post
+                            </Button>
                           </div>
+
+                          {/* Comments list */}
+                          <div className="space-y-4 mt-4 max-h-[60rem] overflow-y-auto custom-scrollbar">
+                            {comments.map((comment) => (
+                              <div key={comment.id} className="border rounded p-3 bg-slate-50 dark:bg-slate-800/30">
+                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                                  <span>
+                                    {comment.user?.firstName || comment.user?.username || "User"}
+                                  </span>
+                                  <span>
+                                    {new Date(comment.createdAt).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="text-sm">{comment.comment}</div>
+                                <div className="mt-2 flex gap-2">
+                                  <Button size="sm" variant="ghost" onClick={() => toggleReply(comment.id)}>
+                                    Reply
+                                  </Button>
+                                </div>
+                                {replyingTo === comment.id && (
+                                  <div className="mt-2 flex gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Write a reply..."
+                                      className="flex-1 border rounded px-3 py-2 text-sm bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                                      value={replyText}
+                                      onChange={(e) => setReplyText(e.target.value)}
+                                    />
+                                    <Button size="sm" onClick={() => handlePostReply(comment.id)} disabled={!replyText.trim()}>
+                                      Post
+                                    </Button>
+                                  </div>
+                                )}
+                                {/* Replies */}
+                                {comment.replies && comment.replies.length > 0 && (
+                                  <div className="mt-3 space-y-2 pl-4 border-l border-slate-200 dark:border-slate-700">
+                                    {comment.replies.map((reply: any) => (
+                                      <div key={reply.id} className="border rounded p-2 bg-slate-100 dark:bg-slate-800/50">
+                                        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                                          <span>
+                                            {reply.user?.firstName || reply.user?.username || "User"}
+                                          </span>
+                                          <span>
+                                            {new Date(reply.createdAt).toLocaleString()}
+                                          </span>
+                                        </div>
+                                        <div className="text-sm">{reply.comment}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </TabsContent>
                     </Tabs>
                   </div>
@@ -559,12 +706,12 @@ export default function CourseContent() {
                 </div>
                 <div>
                   {/* Show Checkmark if completed, else show Button */}
-                  {isLessonCompleted ? (
+                  {currentLesson.title.toLowerCase().includes("certificate") ? null : isLessonCompleted ? (
                       <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-medium text-sm p-2 rounded-md bg-green-50 dark:bg-green-900/30">
-                          <Check className="h-5 w-5"/>
-                          <span>Completed</span>
+                        <Check className="h-5 w-5"/>
+                        <span>Completed</span>
                       </div>
-                  ) : (
+                  ) : currentLesson.title.toLowerCase().includes("certificate") ? null : (
                     <Button variant="default" onClick={handleMarkComplete} disabled={isLoading}>
                        {/* Consider adding a loading state to the button */}
                       <Check className="mr-2 h-4 w-4" />

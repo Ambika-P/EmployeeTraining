@@ -50,14 +50,15 @@ export default function CourseCatalog() {
   const [sortOrder, setSortOrder] = useState("newest");
 
   // Add type hint to useQuery
+  const [currentPage, setCurrentPage] = useState(1);
+  const coursesPerPage = 8;
+
   const { data: courses = [], isLoading } = useQuery<CourseType[]>({
     queryKey: ["/api/courses"],
-    // Add a fetcher function if not using a default one globally
-    // queryFn: async () => {
-    //   const res = await fetch('/api/courses');
-    //   if (!res.ok) throw new Error('Network response was not ok');
-    //   return res.json();
-    // }
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    cacheTime: 0,
   });
 
   // Filter courses based on search query and category
@@ -203,48 +204,57 @@ export default function CourseCatalog() {
             </div>
           </div>
         ) : (
-          <div className={
-            viewMode === "grid" 
-              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" 
-              : "flex flex-col space-y-4" // Use flex-col for list view
-          }>
-            {sortedCourses.map((course) => (
-              // Always render CourseCard, adjust className for list view if needed
-              <CourseCard
-                key={course.id}
-                id={course.id}
-                title={course.title}
-                description={course.description}
-                thumbnailUrl={course.thumbnail ?? undefined}
-                rating={4.5} // Placeholder
-                // Add a className prop to CourseCard if specific list styling is needed
-                // className={viewMode === 'list' ? 'flex-row' : ''} // Example
-              />
-            ))}
-          </div>
-        )}
+          <>
+            <div className={
+              viewMode === "grid" 
+                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" 
+                : "flex flex-col space-y-4"
+            }>
+              {sortedCourses
+                .slice((currentPage - 1) * coursesPerPage, currentPage * coursesPerPage)
+                .map((course) => (
+                  <CourseCard
+                    key={course.id}
+                    id={course.id}
+                    title={course.title}
+                    description={course.description}
+                    thumbnailUrl={course.thumbnail ?? undefined}
+                    rating={4.5}
+                  />
+              ))}
+            </div>
 
-        {/* Pagination - would be implemented with API pagination in real app */}
-        {!isLoading && sortedCourses.length > 0 && (
-          <div className="mt-8 flex justify-center">
-            <nav className="inline-flex rounded-md shadow">
-              <Button variant="outline" className="rounded-l-md rounded-r-none">
-                Previous
-              </Button>
-              <Button variant="outline" className="rounded-none bg-accent text-white">
-                1
-              </Button>
-              <Button variant="outline" className="rounded-none">
-                2
-              </Button>
-              <Button variant="outline" className="rounded-none">
-                3
-              </Button>
-              <Button variant="outline" className="rounded-r-md rounded-l-none">
-                Next
-              </Button>
-            </nav>
-          </div>
+            <div className="mt-8 flex justify-center">
+              <nav className="inline-flex rounded-md shadow">
+                <Button
+                  variant="outline"
+                  className="rounded-l-md rounded-r-none"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                {Array.from({ length: Math.ceil(sortedCourses.length / coursesPerPage) }, (_, i) => (
+                  <Button
+                    key={i + 1}
+                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    className="rounded-none"
+                    onClick={() => setCurrentPage(i + 1)}
+                  >
+                    {i + 1}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  className="rounded-r-md rounded-l-none"
+                  disabled={currentPage === Math.ceil(sortedCourses.length / coursesPerPage)}
+                  onClick={() => setCurrentPage((p) => Math.min(p + 1, Math.ceil(sortedCourses.length / coursesPerPage)))}
+                >
+                  Next
+                </Button>
+              </nav>
+            </div>
+          </>
         )}
       </div>
     </MainLayout>

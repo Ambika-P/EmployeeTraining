@@ -2,7 +2,7 @@ import { PrismaClient, Prisma } from "@prisma/client"; // Import Prisma namespac
 import type {
   User, Course, Module, Lesson, Enrollment, Assessment, Question,
   AssessmentAttempt, Group, GroupMember, CourseAccess, LessonProgress,
-  ActivityLog, Certificate
+  ActivityLog, Certificate, GroupCourse
 } from ".prisma/client"; // Import types from the generated client
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -25,6 +25,8 @@ type InsertCourseAccess = Omit<CourseAccess, 'id' | 'grantedAt'>;
 type InsertLessonProgress = Omit<LessonProgress, 'id' | 'lastAccessedAt' | 'completedAt'>;
 type InsertActivityLog = Omit<ActivityLog, 'id' | 'createdAt' | 'metadata'> & { metadata?: Prisma.InputJsonValue }; // Adjust JSON type
 type InsertCertificate = Omit<Certificate, 'id' | 'issueDate'>;
+// GROUP MANAGEMENT
+type InsertGroupCourse = Omit<GroupCourse, 'id'>;
 
 
 // Re-define the IStorage interface to use Prisma types
@@ -96,13 +98,19 @@ export interface IStorage {
   createGroup(group: InsertGroup): Promise<Group>;
   updateGroup(id: number, group: Partial<Group>): Promise<Group | null>;
   deleteGroup(id: number): Promise<boolean>;
-
   // Group member related methods
   getGroupMember(id: number): Promise<GroupMember | null>;
   getGroupMembersByGroup(groupId: number): Promise<GroupMember[]>;
   getGroupMembersByUser(userId: number): Promise<GroupMember[]>;
   createGroupMember(member: InsertGroupMember): Promise<GroupMember>;
   deleteGroupMember(id: number): Promise<boolean>;
+  // GROUP MANAGEMENT
+  deleteGroupMembersByGroupId(groupId: number): Promise<void>;
+  deleteGroupCoursesByGroupId(groupId: number): Promise<void>;
+  deleteGroupMembers(groupId: number): Promise<boolean>;
+  deleteGroupCourses(groupId: number): Promise<boolean>;
+  getGroupCoursesByGroup(groupId: number): Promise<GroupCourse[]>;
+
 
   // Course access related methods
   getCourseAccess(id: number): Promise<CourseAccess | null>;
@@ -129,6 +137,7 @@ export interface IStorage {
   getCertificatesByUser(userId: number): Promise<Certificate[]>;
   getCertificatesByCourse(courseId: number): Promise<Certificate[]>;
   createCertificate(certificate: InsertCertificate): Promise<Certificate>;
+  getCertificateByHash(certHash: string): Promise<Certificate | null>;
 
   // Session store
   sessionStore: session.Store;
@@ -145,21 +154,57 @@ export class PrismaStorage implements IStorage {
     // Initialize pg Pool for session store
     // Ensure DATABASE_URL is loaded (e.g., using dotenv)
     if (!process.env.DATABASE_URL) {
-        throw new Error("DATABASE_URL environment variable is not set.");
+      throw new Error("DATABASE_URL environment variable is not set.");
     }
     const pool = new pg.Pool({
-        connectionString: process.env.DATABASE_URL,
+      connectionString: process.env.DATABASE_URL,
     });
 
     // Initialize connect-pg-simple store
     const PgSessionStore = connectPgSimple(session);
     this.sessionStore = new PgSessionStore({
-        pool: pool,
-        tableName: 'session' // Matches the table name in schema.prisma
+      pool: pool,
+      tableName: 'session' // Matches the table name in schema.prisma
     });
 
     // Optional: Seed initial data if needed (consider using Prisma seed scripts instead)
     // this.seedData();
+  }
+
+  // --- Comment Methods ---
+  async getCommentsByLesson(lessonId: number): Promise<any[]> {
+    return this.prisma.comment.findMany({
+      where: { lessonId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async getCommentsWithUserByLesson(lessonId: number): Promise<any[]> {
+    return this.prisma.comment.findMany({
+      where: { lessonId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: {
+          select: {
+            username: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+  }
+
+  async createComment(data: { lessonId: number; userId: number; comment: string; parentId?: number | null; createdAt: Date }): Promise<any> {
+    return this.prisma.comment.create({
+      data: {
+        lessonId: data.lessonId,
+        userId: data.userId,
+        comment: data.comment,
+        parentId: data.parentId ?? null,
+        createdAt: data.createdAt,
+      },
+    });
   }
 
   // --- User Methods ---
@@ -205,7 +250,7 @@ export class PrismaStorage implements IStorage {
   }
   // New method to get course with nested content
   async getCourseWithContent(id: number): Promise<Course | null> {
-    return this.prisma.course.findUnique({ 
+    return this.prisma.course.findUnique({
       where: { id },
       include: {
         instructor: true, // Include instructor details
@@ -237,7 +282,7 @@ export class PrismaStorage implements IStorage {
     return this.prisma.course.create({ data: course });
   }
   async updateCourse(id: number, courseData: Partial<Course>): Promise<Course | null> {
-     try {
+    try {
       // Prisma automatically handles updatedAt
       const { id: courseId, updatedAt, ...updateData } = courseData; // Exclude id
       return await this.prisma.course.update({ where: { id }, data: updateData });
@@ -246,7 +291,7 @@ export class PrismaStorage implements IStorage {
     }
   }
   async deleteCourse(id: number): Promise<boolean> {
-     try {
+    try {
       await this.prisma.course.delete({ where: { id } });
       return true;
     } catch (error) {
@@ -265,15 +310,15 @@ export class PrismaStorage implements IStorage {
     return this.prisma.module.create({ data: module });
   }
   async updateModule(id: number, moduleData: Partial<Module>): Promise<Module | null> {
-     try {
-       const { id: moduleId, ...updateData } = moduleData; // Exclude id
+    try {
+      const { id: moduleId, ...updateData } = moduleData; // Exclude id
       return await this.prisma.module.update({ where: { id }, data: updateData });
     } catch (error) {
       return null;
     }
   }
   async deleteModule(id: number): Promise<boolean> {
-     try {
+    try {
       await this.prisma.module.delete({ where: { id } });
       return true;
     } catch (error) {
@@ -292,15 +337,15 @@ export class PrismaStorage implements IStorage {
     return this.prisma.lesson.create({ data: lesson });
   }
   async updateLesson(id: number, lessonData: Partial<Lesson>): Promise<Lesson | null> {
-     try {
-       const { id: lessonId, ...updateData } = lessonData; // Exclude id
+    try {
+      const { id: lessonId, ...updateData } = lessonData; // Exclude id
       return await this.prisma.lesson.update({ where: { id }, data: updateData });
     } catch (error) {
       return null;
     }
   }
   async deleteLesson(id: number): Promise<boolean> {
-     try {
+    try {
       await this.prisma.lesson.delete({ where: { id } });
       return true;
     } catch (error) {
@@ -314,7 +359,7 @@ export class PrismaStorage implements IStorage {
   }
   async getEnrollmentsByUser(userId: number): Promise<Enrollment[]> {
     // Include nested course data with instructor and module count
-    return this.prisma.enrollment.findMany({ 
+    return this.prisma.enrollment.findMany({
       where: { userId },
       include: {
         course: {
@@ -324,12 +369,12 @@ export class PrismaStorage implements IStorage {
                 firstName: true,
                 lastName: true,
               }
-            }, 
+            },
             modules: { // Include modules relation
               select: { // Select only id for counting
-                id: true 
+                id: true
               }
-            } 
+            }
           }
         }
       }
@@ -343,15 +388,15 @@ export class PrismaStorage implements IStorage {
     return this.prisma.enrollment.create({ data: enrollment });
   }
   async updateEnrollment(id: number, enrollmentData: Partial<Enrollment>): Promise<Enrollment | null> {
-     try {
-       const { id: enrollmentId, ...updateData } = enrollmentData; // Exclude id
+    try {
+      const { id: enrollmentId, ...updateData } = enrollmentData; // Exclude id
       return await this.prisma.enrollment.update({ where: { id }, data: updateData });
     } catch (error) {
       return null;
     }
   }
   async deleteEnrollment(id: number): Promise<boolean> {
-     try {
+    try {
       await this.prisma.enrollment.delete({ where: { id } });
       return true;
     } catch (error) {
@@ -359,38 +404,38 @@ export class PrismaStorage implements IStorage {
     }
   }
 
-   // --- Category Methods ---
-async getCategories(): Promise<Category[]> {
-  return this.prisma.category.findMany();
-}
-
-async getCategory(id: number): Promise<Category | null> {
-  return this.prisma.category.findUnique({ where: { id } });
-}
-
-async createCategory(category: { name: string }): Promise<Category> {
-  return this.prisma.category.create({ data: category });
-}
-
-async updateCategory(id: number, category: { name: string }): Promise<Category | null> {
-  try {
-    return await this.prisma.category.update({
-      where: { id },
-      data: category,
-    });
-  } catch (error) {
-    return null;
+  // --- Category Methods ---
+  async getCategories(): Promise<Category[]> {
+    return this.prisma.category.findMany();
   }
-}
 
-async deleteCategory(id: number): Promise<boolean> {
-  try {
-    await this.prisma.category.delete({ where: { id } });
-    return true;
-  } catch (error) {
-    return false;
+  async getCategory(id: number): Promise<Category | null> {
+    return this.prisma.category.findUnique({ where: { id } });
   }
-}
+
+  async createCategory(category: { name: string }): Promise<Category> {
+    return this.prisma.category.create({ data: category });
+  }
+
+  async updateCategory(id: number, category: { name: string }): Promise<Category | null> {
+    try {
+      return await this.prisma.category.update({
+        where: { id },
+        data: category,
+      });
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async deleteCategory(id: number): Promise<boolean> {
+    try {
+      await this.prisma.category.delete({ where: { id } });
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
 
 
   // --- Assessment Methods ---
@@ -405,15 +450,15 @@ async deleteCategory(id: number): Promise<boolean> {
     return this.prisma.assessment.create({ data: assessment });
   }
   async updateAssessment(id: number, assessmentData: Partial<Assessment>): Promise<Assessment | null> {
-     try {
-       const { id: assessmentId, ...updateData } = assessmentData; // Exclude id
+    try {
+      const { id: assessmentId, ...updateData } = assessmentData; // Exclude id
       return await this.prisma.assessment.update({ where: { id }, data: updateData });
     } catch (error) {
       return null;
     }
   }
   async deleteAssessment(id: number): Promise<boolean> {
-     try {
+    try {
       await this.prisma.assessment.delete({ where: { id } });
       return true;
     } catch (error) {
@@ -433,17 +478,17 @@ async deleteCategory(id: number): Promise<boolean> {
     return this.prisma.question.create({ data: question });
   }
   async updateQuestion(id: number, questionData: Partial<Question>): Promise<Question | null> {
-     try {
-       const { id: questionId, ...updateData } = questionData; // Exclude id
+    try {
+      const { id: questionId, ...updateData } = questionData; // Exclude id
 
-       // Directly use updateData, Prisma handles undefined fields correctly.
-       // Ensure the JSON field is correctly typed if present.
-       const data: Prisma.QuestionUpdateInput = {
-         ...updateData,
-         options: 'options' in updateData
-           ? (updateData.options === null ? Prisma.JsonNull : updateData.options)
-           : undefined, // Explicitly undefined if not in updateData
-       };
+      // Directly use updateData, Prisma handles undefined fields correctly.
+      // Ensure the JSON field is correctly typed if present.
+      const data: Prisma.QuestionUpdateInput = {
+        ...updateData,
+        options: 'options' in updateData
+          ? (updateData.options === null ? Prisma.JsonNull : updateData.options)
+          : undefined, // Explicitly undefined if not in updateData
+      };
 
       // Remove undefined keys loop removed - Prisma handles undefined correctly
       // Object.keys(data).forEach(key => data[key] === undefined && delete data[key]);
@@ -454,7 +499,7 @@ async deleteCategory(id: number): Promise<boolean> {
     }
   }
   async deleteQuestion(id: number): Promise<boolean> {
-     try {
+    try {
       await this.prisma.question.delete({ where: { id } });
       return true;
     } catch (error) {
@@ -477,17 +522,17 @@ async deleteCategory(id: number): Promise<boolean> {
     return this.prisma.assessmentAttempt.create({ data: attempt });
   }
   async updateAssessmentAttempt(id: number, attemptData: Partial<AssessmentAttempt>): Promise<AssessmentAttempt | null> {
-     try {
-       const { id: attemptId, ...updateData } = attemptData; // Exclude id
+    try {
+      const { id: attemptId, ...updateData } = attemptData; // Exclude id
 
-        // Directly use updateData, Prisma handles undefined fields correctly.
-       // Ensure the JSON field is correctly typed if present.
-       const data: Prisma.AssessmentAttemptUpdateInput = {
-         ...updateData,
-         answers: 'answers' in updateData
-           ? (updateData.answers === null ? Prisma.JsonNull : updateData.answers)
-           : undefined, // Explicitly undefined if not in updateData
-       };
+      // Directly use updateData, Prisma handles undefined fields correctly.
+      // Ensure the JSON field is correctly typed if present.
+      const data: Prisma.AssessmentAttemptUpdateInput = {
+        ...updateData,
+        answers: 'answers' in updateData
+          ? (updateData.answers === null ? Prisma.JsonNull : updateData.answers)
+          : undefined, // Explicitly undefined if not in updateData
+      };
 
       // Remove undefined keys loop removed - Prisma handles undefined correctly
       // Object.keys(data).forEach(key => data[key] === undefined && delete data[key]);
@@ -505,24 +550,59 @@ async deleteCategory(id: number): Promise<boolean> {
   async getGroups(): Promise<Group[]> {
     return this.prisma.group.findMany();
   }
+  // --- GROUP MANAGEMENT ---
+  async createGroupCourse(course: InsertGroupCourse): Promise<GroupCourse> {
+    return this.prisma.groupCourse.create({ data: course });
+  }
+  // --- GROUP MANAGEMENT ---
+  async getGroupsWithDetails(): Promise<any[]> {
+    const groups = await this.prisma.group.findMany({
+      include: {
+        members: { include: { user: true } },
+        courses: { include: { course: true } },
+      },
+    });
+
+    return groups.map(group => ({
+      id: group.id,
+      name: group.name,
+      users: group.members.map(m => m.user?.name).filter(Boolean),
+      courses: group.courses.map(c => c.course?.name).filter(Boolean),
+    }));
+  }
+
   async createGroup(group: InsertGroup): Promise<Group> {
     return this.prisma.group.create({ data: group });
   }
   async updateGroup(id: number, groupData: Partial<Group>): Promise<Group | null> {
-     try {
-       const { id: groupId, ...updateData } = groupData; // Exclude id
+    try {
+      const { id: groupId, ...updateData } = groupData; // Exclude id
       return await this.prisma.group.update({ where: { id }, data: updateData });
     } catch (error) {
       return null;
     }
   }
   async deleteGroup(id: number): Promise<boolean> {
-     try {
+    try {
       await this.prisma.group.delete({ where: { id } });
       return true;
     } catch (error) {
       return false;
     }
+  }
+  // --- GROUP MANAGEMENT ---
+  async deleteGroupMembersByGroupId(groupId: number): Promise<void> {
+    await this.prisma.groupMember.deleteMany({ where: { groupId } });
+  }
+
+  // --- GROUP MANAGEMENT ---
+  async deleteGroupCoursesByGroupId(groupId: number): Promise<void> {
+    await this.prisma.groupCourse.deleteMany({ where: { groupId } });
+  }
+
+  // --- GROUP MANAGEMENT ---
+  async getGroupCoursesByGroup(groupId: number): Promise<GroupCourse[]> {
+    return this.prisma.groupCourse.findMany({ where: { groupId } });
   }
 
   // --- Group Member Methods ---
@@ -539,14 +619,34 @@ async deleteCategory(id: number): Promise<boolean> {
     return this.prisma.groupMember.create({ data: member });
   }
   async deleteGroupMember(id: number): Promise<boolean> {
-     try {
+    try {
       await this.prisma.groupMember.delete({ where: { id } });
       return true;
     } catch (error) {
       return false;
     }
   }
+  // --- GROUP MANAGEMENT ---
+  async deleteGroupMembers(groupId: number): Promise<boolean> {
+    try {
+      await this.prisma.groupMember.deleteMany({ where: { groupId } });
+      return true;
+    } catch (error) {
+      console.error("Error deleting group members:", error);
+      return false;
+    }
+  }
 
+  // Delete all courses linked to a group
+  async deleteGroupCourses(groupId: number): Promise<boolean> {
+    try {
+      await this.prisma.groupCourse.deleteMany({ where: { groupId } });
+      return true;
+    } catch (error) {
+      console.error("Error deleting group courses:", error);
+      return false;
+    }
+  }
   // --- Course Access Methods ---
   async getCourseAccess(id: number): Promise<CourseAccess | null> {
     return this.prisma.courseAccess.findUnique({ where: { id } });
@@ -564,7 +664,7 @@ async deleteCategory(id: number): Promise<boolean> {
     return this.prisma.courseAccess.create({ data: access });
   }
   async deleteCourseAccess(id: number): Promise<boolean> {
-     try {
+    try {
       await this.prisma.courseAccess.delete({ where: { id } });
       return true;
     } catch (error) {
@@ -600,10 +700,10 @@ async deleteCategory(id: number): Promise<boolean> {
     return this.prisma.lessonProgress.create({ data: progress });
   }
   async updateLessonProgress(id: number, progress: Partial<LessonProgress>): Promise<LessonProgress | null> {
-     try {
-       const { id: progressId, ...updateData } = progress; // Exclude id
-       // Ensure lastAccessedAt is updated if not explicitly provided
-       const dataToUpdate = { ...updateData, lastAccessedAt: new Date() };
+    try {
+      const { id: progressId, ...updateData } = progress; // Exclude id
+      // Ensure lastAccessedAt is updated if not explicitly provided
+      const dataToUpdate = { ...updateData, lastAccessedAt: new Date() };
       return await this.prisma.lessonProgress.update({ where: { id }, data: dataToUpdate });
     } catch (error) {
       return null;
@@ -626,7 +726,22 @@ async deleteCategory(id: number): Promise<boolean> {
     return this.prisma.certificate.findUnique({ where: { id } });
   }
   async getCertificatesByUser(userId: number): Promise<Certificate[]> {
-    return this.prisma.certificate.findMany({ where: { userId } });
+    return this.prisma.certificate.findMany({
+      where: { userId },
+      include: {
+        course: {
+          select: {
+            title: true,
+          },
+        },
+      },
+    });
+  }
+
+  async getCertificateByHash(certHash: string): Promise<Certificate | null> {
+    return this.prisma.certificate.findFirst({
+      where: { certificateId: certHash },
+    });
   }
   async getCertificatesByCourse(courseId: number): Promise<Certificate[]> {
     return this.prisma.certificate.findMany({ where: { courseId } });
@@ -634,6 +749,7 @@ async deleteCategory(id: number): Promise<boolean> {
   async createCertificate(certificate: InsertCertificate): Promise<Certificate> {
     return this.prisma.certificate.create({ data: certificate });
   }
+
 
   // Optional: Method to disconnect Prisma client when server shuts down
   async disconnect(): Promise<void> {

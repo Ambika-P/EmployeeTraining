@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
@@ -6,35 +7,16 @@ import { Award, Download, Share2, Calendar, FileText } from "lucide-react";
 
 export default function Certificates() {
   const { user } = useAuth();
-  
-  // Mock data for demonstration
-  const certificates = [
-    {
-      id: 1,
-      title: "JavaScript Fundamentals",
-      issueDate: "August 15, 2023",
-      instructor: "John Doe",
-      courseHours: 8,
-      certificateId: "CERT-JS-001",
-    },
-    {
-      id: 2,
-      title: "HTML & CSS Basics",
-      issueDate: "July 24, 2023",
-      instructor: "Robert Brown",
-      courseHours: 5,
-      certificateId: "CERT-HTML-002",
-    },
-    {
-      id: 3,
-      title: "Introduction to TypeScript",
-      issueDate: "June 10, 2023",
-      instructor: "Emily Davis",
-      courseHours: 7,
-      certificateId: "CERT-TS-003",
-    },
-  ];
-  
+
+  const { data: certificates = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/certificates-user"],
+    enabled: !!user,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    cacheTime: 0,
+  });
+
   return (
     <MainLayout>
       <div className="bg-white dark:bg-slate-900 shadow">
@@ -45,18 +27,31 @@ export default function Certificates() {
           </p>
         </div>
       </div>
-      
+
       <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center">
+                <svg className="animate-spin h-10 w-10 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+                <p className="mt-4 text-slate-500 dark:text-slate-400">Loading certificates...</p>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {certificates.map((certificate) => (
-            <Card key={certificate.id} className="overflow-hidden">
+          {certificates.map((cert) => (
+            <Card key={cert.id} className="overflow-hidden">
               <div className="bg-gradient-to-r from-slate-700 to-slate-900 p-4">
                 <div className="flex justify-center">
                   <Award className="h-12 w-12 text-amber-400" />
                 </div>
               </div>
               <CardHeader>
-                <CardTitle className="text-center">{certificate.title}</CardTitle>
+                <CardTitle className="text-center">{cert.course.title || "Course"}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -65,22 +60,14 @@ export default function Certificates() {
                       <Calendar className="h-4 w-4 text-slate-400 mr-2" />
                       <span>Issue Date:</span>
                     </div>
-                    <span className="font-medium">{certificate.issueDate}</span>
+                    <span className="font-medium">{cert.issueDate ? new Date(cert.issueDate).toLocaleDateString() : "N/A"}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <div className="flex items-center">
                       <FileText className="h-4 w-4 text-slate-400 mr-2" />
                       <span>Certificate ID:</span>
                     </div>
-                    <span className="font-medium">{certificate.certificateId}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span>Instructor:</span>
-                    <span className="font-medium">{certificate.instructor}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span>Course Duration:</span>
-                    <span className="font-medium">{certificate.courseHours} hours</span>
+                    <span className="font-medium">{cert.certificateId || cert.id}</span>
                   </div>
                 </div>
               </CardContent>
@@ -89,16 +76,22 @@ export default function Certificates() {
                   <Share2 className="mr-2 h-4 w-4" />
                   Share
                 </Button>
-                <Button size="sm">
+                <a
+                  href={`/public/certificate/${cert.certificateId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
                   <Download className="mr-2 h-4 w-4" />
-                  Download
-                </Button>
+                  View Certificate
+                </a>
               </CardFooter>
             </Card>
           ))}
         </div>
-        
-        {certificates.length === 0 && (
+        )}
+
+        {certificates.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <Award className="h-16 w-16 text-slate-300 dark:text-slate-600 mb-4" />
             <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">No Certificates Yet</h3>

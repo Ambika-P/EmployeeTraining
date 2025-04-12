@@ -14,6 +14,7 @@ const courseFormSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }).max(500, { message: "Description cannot exceed 500 characters." }),
   category: z.string().optional(), // Example: Programming, Design, Business
+  thumbnail: z.string().url("Must be a valid file").or(z.literal("")).optional(),
   // Add other relevant fields like target audience, difficulty level, etc.
 });
 
@@ -40,6 +41,7 @@ export function CourseForm({ initialData, onSubmit, isSubmitting }: CourseFormPr
       title: initialData?.title || "",
       description: initialData?.description || "",
       category: initialData?.category || "",
+      thumbnail: initialData?.thumbnail || "",
     },
   });
 
@@ -111,6 +113,67 @@ export function CourseForm({ initialData, onSubmit, isSubmitting }: CourseFormPr
         />
 
         {/* Add more fields as needed */}
+
+        <FormField
+          control={form.control}
+          name="thumbnail"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Course Image (Optional)</FormLabel>
+              <FormControl>
+                <>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const formData = new FormData();
+                      formData.append("image", file);
+                      try {
+                        const res = await fetch("/api/upload/image", {
+                          method: "POST",
+                          body: formData,
+                        });
+                        if (!res.ok) throw new Error("Upload failed");
+                        const data = await res.json();
+                        if (data.url) {
+                          const absoluteUrl = `${window.location.origin}${data.url}`;
+                          field.onChange(absoluteUrl);
+                        } else {
+                          alert("Upload failed: No URL returned");
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        alert("Image upload failed");
+                      }
+                    }}
+                  />
+                  {field.value && field.value.trim() !== "" && !field.value.includes("placeholder.com") && (
+                    <div className="mt-2 flex flex-col items-start gap-2">
+                      <img
+                        src={field.value}
+                        alt="Course Thumbnail"
+                        className="max-h-40 rounded"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => field.onChange("")}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Remove Image
+                      </button>
+                    </div>
+                  )}
+                </>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? (

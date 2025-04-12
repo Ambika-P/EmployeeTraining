@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, Bell, Sun, Moon, Menu } from "lucide-react";
+import LOGO from "../../../favicon.png"
 
 interface HeaderProps {
   onMobileMenuToggle: () => void;
@@ -26,15 +27,15 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
 
   const getInitials = () => {
     if (!user) return "?";
-    
+
     if (user.firstName && user.lastName) {
       return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
     }
-    
+
     if (user.username) {
       return user.username.slice(0, 2).toUpperCase();
     }
-    
+
     return "?";
   };
 
@@ -57,14 +58,27 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
         </Button>
 
         {/* Logo */}
+        {/* <div className="flex items-center">
+          <Link href="/" className="flex-shrink-0 flex items-center ml-0 lg:ml-0">
+            <span className="font-bold text-xl text-slate-900 dark:text-white">LMS</span>
+          </Link>
+        </div> */}
+
         <div className="flex items-center">
           <Link href="/" className="flex-shrink-0 flex items-center ml-0 lg:ml-0">
+            <img
+              src="../../../alten.png"
+              title="Alten Global Technologies Private Limited"
+              alt="Alten Global Technologies Private Limited"
+              className="h-10 w-12 mr-2"
+            />
             <span className="font-bold text-xl text-slate-900 dark:text-white">LMS</span>
           </Link>
         </div>
 
+
         {/* Search input */}
-        <div className="flex-1 max-w-xl mx-auto lg:max-w-2xl px-4">
+        {/* <div className="flex-1 max-w-xl mx-auto lg:max-w-2xl px-4">
           <div className="relative">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <Search className="h-4 w-4 text-slate-400" />
@@ -76,7 +90,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
               id="search"
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Right side navigation items */}
         <div className="ml-auto flex items-center space-x-4">
@@ -110,7 +124,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
             <DropdownMenuContent align="end" className="w-80">
               <DropdownMenuLabel>Notifications</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <div className="max-h-72 overflow-y-auto py-1">
+              <div className="max-h-72 overflow-y-auto overflow-x-hidden break-words py-1">
                 <div className="py-2 px-4">
                   <div className="font-medium">New course available</div>
                   <div className="text-sm text-gray-500">TypeScript Essentials is now available.</div>
